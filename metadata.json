@@ -1,0 +1,6 @@
+{
+  "name": "Multi-Protocol Android VPN Client",
+  "description": "Production-ready Android VPN client architecture supporting 7+ censorship-resistant protocols with modular daemon and hev-socks5-tunnel JNI engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
