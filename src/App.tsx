@@ -191,6 +191,10 @@ export default function App() {
     { ip: '188.114.96.1', port: 1701, ping: 54, isp: 'Mytel 4.5G' }
   ]);
 
+  const [isAutoBestPingEnabled, setIsAutoBestPingEnabled] = useState(true);
+  const [isSubFetching, setIsSubFetching] = useState(false);
+  const [subUrlInput, setSubUrlInput] = useState('');
+  const [importMode, setImportMode] = useState<'single' | 'subscription'>('subscription');
   const [selectedServer, setSelectedServer] = useState<ServerProfile>(servers[0]);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('connected');
   const [dashboardVisualMode, setDashboardVisualMode] = useState<'hacker' | 'ring'>('hacker');
@@ -290,20 +294,112 @@ export default function App() {
     }, 1000);
   };
 
+  const selectFastestNode = () => {
+    setIsPinging(true);
+    addLog('INFO', 'SmartUrlTest', 'Testing RTT across all 10 protocols to select lowest latency node...');
+    setTimeout(() => {
+      const refreshed = servers.map(s => ({
+        ...s,
+        latency: Math.max(22, Math.floor(s.latency + (Math.random() * 20 - 10)))
+      }));
+      refreshed.sort((a, b) => a.latency - b.latency);
+      const fastest = refreshed[0];
+      setServers(refreshed);
+      setSelectedServer(fastest);
+      setIsPinging(false);
+      addLog('INFO', 'SmartUrlTest', `AUTO-LOCKED FASTEST NODE: ${fastest.name} [${fastest.protocol}] (${fastest.latency}ms RTT)`);
+    }, 900);
+  };
+
+  const handleFetchSubscription = () => {
+    if (!subUrlInput.trim()) return;
+    setIsSubFetching(true);
+    addLog('INFO', 'SubFetcher', `Fetching multi-protocol subscription manifest from: ${subUrlInput.slice(0, 32)}...`);
+
+    setTimeout(() => {
+      // Simulate decoding base64 subscription containing VLESS XHTTP, Hysteria 2, AmneziaWG, TUIC, AnyTLS
+      const importedBatch: ServerProfile[] = [
+        {
+          id: `sub-${Date.now()}-1`,
+          name: '🇸🇬 SG VLESS XHTTP REALITY (Sub Auto-01)',
+          host: 'sg-vip-sub.aegistunnel.net',
+          port: 443,
+          protocol: 'VLESS',
+          latency: 31,
+          camouflage: 'xhttp-splithttp / reality / dl.google.com'
+        },
+        {
+          id: `sub-${Date.now()}-2`,
+          name: '🇸🇬 SG Hysteria 2 Turbo (Sub Auto-02)',
+          host: 'hy2-fast.aegistunnel.net',
+          port: 8443,
+          protocol: 'HY2',
+          latency: 29,
+          camouflage: 'UDP BBRv3 / quic-stealth / ech'
+        },
+        {
+          id: `sub-${Date.now()}-3`,
+          name: '🇭🇰 HK AmneziaWG Anti-DPI (Sub Auto-03)',
+          host: 'hk-awg.aegistunnel.net',
+          port: 51820,
+          protocol: 'AWG',
+          latency: 44,
+          camouflage: 'Junk header / random padding bytes'
+        },
+        {
+          id: `sub-${Date.now()}-4`,
+          name: '🇯🇵 JP TUIC v5 QUIC Zero-RTT (Sub Auto-04)',
+          host: 'jp-tuic.aegistunnel.net',
+          port: 8443,
+          protocol: 'TUIC',
+          latency: 48,
+          camouflage: 'QUIC / BBR / Zero-RTT'
+        },
+        {
+          id: `sub-${Date.now()}-5`,
+          name: '🇹🇼 TW AnyTLS Chameleon (Sub Auto-05)',
+          host: 'tw-anytls.aegistunnel.net',
+          port: 443,
+          protocol: 'AWG',
+          latency: 55,
+          camouflage: 'Dynamic TLS fingerprint permutation'
+        }
+      ];
+
+      // Merge and auto-sort to find best
+      const combined = [...importedBatch, ...servers];
+      combined.sort((a, b) => a.latency - b.latency);
+      setServers(combined);
+      setSelectedServer(combined[0]);
+      setIsSubFetching(false);
+      setShowImportDialog(false);
+      setSubUrlInput('');
+      addLog('INFO', 'SubFetcher', `Extracted 5 resilient nodes from sub link! Auto-selected best node: ${combined[0].name} (${combined[0].latency}ms)`);
+    }, 1200);
+  };
+
   const handleImport = () => {
+    if (importMode === 'subscription') {
+      handleFetchSubscription();
+      return;
+    }
     if (!importText.trim()) return;
     const isHy2 = importText.startsWith('hysteria2://') || importText.startsWith('hy2://');
     const isVless = importText.startsWith('vless://');
+    const isTuic = importText.startsWith('tuic://');
+    const isAwg = importText.startsWith('awg://') || importText.startsWith('amneziawg://');
+
     const newSrv: ServerProfile = {
       id: `srv-${Date.now()}`,
-      name: isHy2 ? 'Imported Hysteria 2 Node' : isVless ? 'Imported VLESS Reality' : 'Custom Imported Proxy Node',
+      name: isHy2 ? 'Imported Hysteria 2 Node' : isVless ? 'Imported VLESS Reality' : isTuic ? 'Imported TUIC v5' : isAwg ? 'Imported AmneziaWG' : 'Custom Imported Proxy Node',
       host: 'imported.server.node',
       port: 443,
-      protocol: isHy2 ? 'HY2' : isVless ? 'VLESS' : 'WARP',
-      latency: Math.floor(Math.random() * 60 + 35),
+      protocol: isHy2 ? 'HY2' : isVless ? 'VLESS' : isTuic ? 'TUIC' : isAwg ? 'AWG' : 'WARP',
+      latency: Math.floor(Math.random() * 40 + 25),
       camouflage: 'TLS 1.3 / User Custom URI'
     };
-    setServers(prev => [newSrv, ...prev]);
+    const updated = [newSrv, ...servers];
+    setServers(updated);
     setSelectedServer(newSrv);
     setShowImportDialog(false);
     setImportText('');
@@ -615,18 +711,56 @@ export default function App() {
               </div>
             </div>
 
+            {/* SMART AUTO-BEST PING (URL-TEST) CONTROLLER */}
+            <div className="p-3 rounded-2xl bg-purple-950/40 border border-purple-500/40 flex items-center justify-between shadow-lg shadow-purple-900/10">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                  <Activity className="w-4 h-4 text-purple-300" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    Smart Auto-Pick Lowest Ping
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
+                      URL-TEST
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400">
+                    Auto-routes through lowest RTT node ({selectedServer.latency}ms • {selectedServer.protocol})
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={selectFastestNode}
+                disabled={isPinging}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-mono text-[11px] font-bold shadow-md shadow-purple-600/30 flex items-center gap-1.5 transition-all disabled:opacity-50 active:scale-95"
+              >
+                <Zap className={`w-3.5 h-3.5 text-amber-300 ${isPinging ? 'animate-bounce' : ''}`} />
+                <span>{isPinging ? 'Testing...' : 'Pick Fastest'}</span>
+              </button>
+            </div>
+
             <div className="flex items-center justify-between pt-1">
               <div className="text-xs font-mono font-bold text-slate-400 uppercase">
                 AVAILABLE RESILIENT NODES ({servers.length})
               </div>
-              <button
-                onClick={pingAllServers}
-                disabled={isPinging}
-                className="flex items-center gap-1 text-xs font-mono text-cyan-400 hover:text-cyan-300 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isPinging ? 'animate-spin' : ''}`} />
-                <span>{isPinging ? 'Pinging...' : 'Batch Ping'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowImportDialog(true)}
+                  className="flex items-center gap-1 text-xs font-mono text-purple-400 hover:text-purple-300"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Sub / URI</span>
+                </button>
+                <button
+                  onClick={pingAllServers}
+                  disabled={isPinging}
+                  className="flex items-center gap-1 text-xs font-mono text-cyan-400 hover:text-cyan-300 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isPinging ? 'animate-spin' : ''}`} />
+                  <span>{isPinging ? 'Pinging...' : 'Batch Ping'}</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -985,21 +1119,72 @@ export default function App() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-white font-mono">IMPORT PROXY NODE</h3>
+              <h3 className="text-base font-black text-white font-mono flex items-center gap-2">
+                <Download className="w-4 h-4 text-purple-400" /> IMPORT PROXY / SUB
+              </h3>
               <button onClick={() => setShowImportDialog(false)} className="text-slate-400 hover:text-white">
                 ✕
               </button>
             </div>
-            <p className="text-xs text-slate-400">
-              Paste standard share link (vless://, hysteria2://, tuic://, amneziawg://):
-            </p>
-            <textarea
-              value={importText}
-              onChange={e => setImportText(e.target.value)}
-              placeholder="vless://... or hysteria2://..."
-              className="w-full h-28 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-white focus:outline-none focus:border-purple-500"
-            />
-            <div className="flex justify-end gap-2">
+
+            {/* Mode Switcher */}
+            <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-mono">
+              <button
+                onClick={() => setImportMode('subscription')}
+                className={`py-1.5 rounded-lg transition-colors font-bold ${
+                  importMode === 'subscription'
+                    ? 'bg-purple-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Subscription Link (All 7)
+              </button>
+              <button
+                onClick={() => setImportMode('single')}
+                className={`py-1.5 rounded-lg transition-colors font-bold ${
+                  importMode === 'single'
+                    ? 'bg-purple-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Single Node URI
+              </button>
+            </div>
+
+            {importMode === 'subscription' ? (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-300">
+                  Paste Subscription URL containing VLESS, Hysteria 2, TUIC, AmneziaWG nodes:
+                </p>
+                <div className="space-y-1">
+                  <input
+                    type="text"
+                    value={subUrlInput}
+                    onChange={e => setSubUrlInput(e.target.value)}
+                    placeholder="https://example.com/api/v1/client/subscribe?token=..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-white focus:outline-none focus:border-purple-500 placeholder-slate-600"
+                  />
+                  <div className="flex items-center gap-1.5 text-[10px] text-cyan-300 font-mono pt-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Auto-scans and locks onto the fastest lowest ping node automatically!</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400">
+                  Paste standard share link (vless://, hysteria2://, tuic://, amneziawg://):
+                </p>
+                <textarea
+                  value={importText}
+                  onChange={e => setImportText(e.target.value)}
+                  placeholder="vless://... or hysteria2://... or tuic://..."
+                  className="w-full h-28 bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setShowImportDialog(false)}
                 className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white"
@@ -1008,10 +1193,20 @@ export default function App() {
               </button>
               <button
                 onClick={handleImport}
-                disabled={!importText.trim()}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-40"
+                disabled={importMode === 'subscription' ? (!subUrlInput.trim() || isSubFetching) : !importText.trim()}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white disabled:opacity-40 flex items-center gap-1.5 shadow-lg shadow-purple-600/30"
               >
-                Import Node
+                {isSubFetching ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Fetching & Auto-Selecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
+                    <span>{importMode === 'subscription' ? 'Sync & Pick Fastest' : 'Import Node'}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
