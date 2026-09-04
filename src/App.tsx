@@ -86,54 +86,109 @@ export default function App() {
     { ip: '192.168.43.178', name: 'Windows Work Laptop', transferred: '48.2 MB' }
   ]);
 
-  // Server List
+  // Server List (All 10 Anti-Censorship Protocols Supported)
   const [servers, setServers] = useState<ServerProfile[]>([
     {
       id: 'srv-1',
       name: 'Cloudflare WARP (Clean-IP Anycast)',
-      host: 'engage.cloudflareclient.com',
+      host: '162.159.193.10',
       port: 2408,
       protocol: 'WARP',
-      latency: 42,
-      camouflage: 'WireGuard Dynamic Key Exchange',
+      latency: 36,
+      camouflage: 'WireGuard Dynamic Key Exchange (Zero-Config Free)',
       isBuiltIn: true
     },
     {
       id: 'srv-2',
-      name: 'Singapore Hysteria 2 (UDP BBRv3)',
+      name: 'VLESS + XHTTP + REALITY (Splithttp)',
+      host: 'sg-xhttp.aegistunnel.net',
+      port: 443,
+      protocol: 'VLESS',
+      latency: 41,
+      camouflage: 'xhttp-chunked / reality / safari: icloud.com'
+    },
+    {
+      id: 'srv-3',
+      name: 'Singapore Hysteria 2 (UDP BBRv3 Turbo)',
       host: 'sg1.aegistunnel.net',
       port: 8443,
       protocol: 'HY2',
       latency: 38,
-      camouflage: 'TLS 1.3 / quic-stealth / ech'
-    },
-    {
-      id: 'srv-3',
-      name: 'Tokyo VLESS Reality (Chrome Vision)',
-      host: 'jp-tok.aegistunnel.net',
-      port: 443,
-      protocol: 'VLESS',
-      latency: 76,
-      camouflage: 'reality / safari-target: icloud.com'
+      camouflage: 'TLS 1.3 / quic-stealth / ech / bbrv3'
     },
     {
       id: 'srv-4',
-      name: 'Frankfurt NaiveProxy (Cronet Chromium)',
-      host: 'fra-node.aegistunnel.net',
-      port: 443,
-      protocol: 'NAIVE',
-      latency: 148,
-      camouflage: 'HTTP/3 Quic Chrome Masquerade'
-    },
-    {
-      id: 'srv-5',
-      name: 'AmneziaWG Junk-Packet Shaper',
+      name: 'AmneziaWG (Junk-Packet Shaper)',
       host: 'hk.amnezia-core.org',
       port: 51820,
       protocol: 'AWG',
-      latency: 61,
-      camouflage: 'Junk header / random padding bytes'
+      latency: 55,
+      camouflage: 'Junk header / random padding bytes (Anti-DPI)'
+    },
+    {
+      id: 'srv-5',
+      name: 'Frankfurt NaiveProxy (Chromium Stack)',
+      host: 'fra-node.aegistunnel.net',
+      port: 443,
+      protocol: 'NAIVE',
+      latency: 135,
+      camouflage: 'HTTP/3 Quic Chrome Browser Masquerade'
+    },
+    {
+      id: 'srv-6',
+      name: 'Seoul TUIC v5 (QUIC BBR Engine)',
+      host: 'kr-tuic.aegistunnel.net',
+      port: 8443,
+      protocol: 'TUIC',
+      latency: 68,
+      camouflage: 'QUIC Congestion Stream / Zero-RTT'
+    },
+    {
+      id: 'srv-7',
+      name: 'Hong Kong AnyTLS (Chameleon TLS)',
+      host: 'hk-anytls.aegistunnel.net',
+      port: 443,
+      protocol: 'AWG',
+      latency: 52,
+      camouflage: 'Dynamic TLS fingerprint permutation'
+    },
+    {
+      id: 'srv-8',
+      name: 'Tokyo VLESS Reality (Vision Flow)',
+      host: 'jp-tok.aegistunnel.net',
+      port: 443,
+      protocol: 'VLESS',
+      latency: 72,
+      camouflage: 'reality / chrome-vision / dl.google.com'
+    },
+    {
+      id: 'srv-9',
+      name: 'SSH Direct & WebSocket (Payload Injector)',
+      host: 'sg-ssh.aegistunnel.net',
+      port: 80,
+      protocol: 'SSH',
+      latency: 48,
+      camouflage: 'HTTP Custom Payload / Dropbear SSH'
+    },
+    {
+      id: 'srv-10',
+      name: 'Shadowsocks-2022 + Cloak (AEAD)',
+      host: 'sg-ss.aegistunnel.net',
+      port: 8388,
+      protocol: 'SS-CLOAK',
+      latency: 46,
+      camouflage: '2022-blake3-aes-256-gcm + TLS Cloak'
     }
+  ]);
+
+  // WARP Clean-IP Scanner State
+  const [warpStatus, setWarpStatus] = useState<'REGISTERED' | 'UNREGISTERED'>('REGISTERED');
+  const [warpKey, setWarpKey] = useState('0x9fA2...e47B (Free Cloudflare Unlimited)');
+  const [isScanningCleanIp, setIsScanningCleanIp] = useState(false);
+  const [cleanIpResults, setCleanIpResults] = useState<{ ip: string; port: number; ping: number; isp: string }[]>([
+    { ip: '162.159.193.10', port: 2408, ping: 36, isp: 'MPT / ATOM Best' },
+    { ip: '162.159.192.1', port: 2408, ping: 42, isp: 'Ooredoo Fiber' },
+    { ip: '188.114.96.1', port: 1701, ping: 54, isp: 'Mytel 4.5G' }
   ]);
 
   const [selectedServer, setSelectedServer] = useState<ServerProfile>(servers[0]);
@@ -253,6 +308,29 @@ export default function App() {
     setShowImportDialog(false);
     setImportText('');
     addLog('INFO', 'UriParser', `Parsed and registered profile: ${newSrv.name} (${newSrv.protocol})`);
+  };
+
+  const generateNewWarpKey = () => {
+    const randomHex = Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    setWarpKey(`0x${randomHex.toUpperCase()}...${randomHex.slice(0, 4).toUpperCase()} (Active WARP+ WireGuard)`);
+    addLog('INFO', 'WarpClient', 'Generated fresh Cloudflare WireGuard dynamic private key & peer endpoint');
+  };
+
+  const runCleanIpScan = () => {
+    setIsScanningCleanIp(true);
+    addLog('INFO', 'CleanIpScanner', 'Testing MPT, Atom, Ooredoo, Mytel clean anycast endpoints...');
+    setTimeout(() => {
+      const updated = [
+        { ip: '162.159.193.10', port: 2408, ping: Math.floor(Math.random() * 8 + 28), isp: 'MPT / ATOM Turbo' },
+        { ip: '162.159.192.1', port: 2408, ping: Math.floor(Math.random() * 10 + 34), isp: 'Ooredoo Fiber' },
+        { ip: '188.114.96.1', port: 1701, ping: Math.floor(Math.random() * 12 + 42), isp: 'Mytel 4.5G Clean' },
+      ];
+      setCleanIpResults(updated);
+      setIsScanningCleanIp(false);
+      // Automatically update WARP server endpoint to lowest ping
+      setServers(prev => prev.map(s => s.protocol === 'WARP' ? { ...s, latency: updated[0].ping, host: updated[0].ip, port: updated[0].port } : s));
+      addLog('INFO', 'CleanIpScanner', `Auto-applied lowest latency clean endpoint ${updated[0].ip}:${updated[0].port} (${updated[0].ping}ms)`);
+    }, 1200);
   };
 
   const toggleAppProxy = (appId: string) => {
@@ -467,7 +545,77 @@ export default function App() {
         {/* TAB 2: SERVERS LIST */}
         {activeTab === 'servers' && (
           <div className="space-y-3 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between">
+            {/* CLOUDFLARE WARP ZERO-CONFIG & CLEAN-IP SCANNER SUITE */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-purple-950/30 to-slate-900 border border-purple-500/30 space-y-3 shadow-lg shadow-purple-500/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      Cloudflare WARP Suite
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                        FREE UNLIMITED
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Zero-Config WireGuard Key & Clean-IP Scanner
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={generateNewWarpKey}
+                  className="px-2.5 py-1 rounded-lg bg-purple-600/80 hover:bg-purple-600 text-[10px] font-mono font-bold text-white transition-colors"
+                >
+                  Regen Key
+                </button>
+              </div>
+
+              {/* Active Key display */}
+              <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-[10px] font-mono flex items-center justify-between">
+                <span className="text-slate-400 truncate max-w-[240px]">Key: {warpKey}</span>
+                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" /> READY
+                </span>
+              </div>
+
+              {/* Clean IP Scanner Controls */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">
+                    MYANMAR CLEAN-IP OPTIMIZER (MPT/ATOM/OOREDOO/MYTEL):
+                  </span>
+                  <button
+                    onClick={runCleanIpScan}
+                    disabled={isScanningCleanIp}
+                    className="flex items-center gap-1 text-[10px] font-mono text-cyan-400 hover:text-cyan-300 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isScanningCleanIp ? 'animate-spin' : ''}`} />
+                    <span>{isScanningCleanIp ? 'Scanning IPs...' : 'Auto-Scan Clean IPs'}</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5">
+                  {cleanIpResults.map((item, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setServers(prev => prev.map(s => s.protocol === 'WARP' ? { ...s, latency: item.ping, host: item.ip, port: item.port } : s));
+                        addLog('INFO', 'CleanIpSelector', `Applied clean endpoint ${item.ip}:${item.port} (${item.isp})`);
+                      }}
+                      className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/50 cursor-pointer transition-colors text-center"
+                    >
+                      <div className="text-[9px] font-mono text-slate-400 truncate">{item.isp}</div>
+                      <div className="text-xs font-mono font-bold text-white">{item.ping}ms</div>
+                      <div className="text-[8px] font-mono text-cyan-400 truncate">{item.ip}:{item.port}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
               <div className="text-xs font-mono font-bold text-slate-400 uppercase">
                 AVAILABLE RESILIENT NODES ({servers.length})
               </div>
