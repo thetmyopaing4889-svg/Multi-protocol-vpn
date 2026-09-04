@@ -36,14 +36,11 @@ jobs:
         run: |
           npm run build
 
-      - name: Initialize Capacitor Android Project
+      - name: Recreate Android Project Cleanly
         run: |
-          if [ ! -d "android" ]; then
-            npx cap init "Aegis Tunnel" "com.aegis.vpn" --web-dir dist
-            npx cap add android
-          else
-            npx cap sync android
-          fi
+          rm -rf android
+          npx cap add android
+          npx cap sync android
 
       - name: Build Android APK
         run: |
