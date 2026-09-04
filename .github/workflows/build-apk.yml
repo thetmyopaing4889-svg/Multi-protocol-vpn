@@ -27,7 +27,6 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          cmdline-tools-version: 9477386
           packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
       - name: Setup Gradle
@@ -42,17 +41,37 @@ jobs:
         run: |
           npm run build
 
-      - name: Generate Fresh Android Project
+      - name: Generate and Patch Android Project
         run: |
           rm -rf android
           npx cap add android
           npx cap sync android
 
+          # Fix Kotlin duplicate class error (kotlin-stdlib-jdk7 / jdk8 collision)
+          cat << 'EOF' >> android/app/build.gradle
+
+          configurations.all {
+              resolutionStrategy {
+                  eachDependency { DependencyResolveDetails details ->
+                      if (details.requested.group == 'org.jetbrains.kotlin' && 
+                          (details.requested.name == 'kotlin-stdlib-jdk7' || details.requested.name == 'kotlin-stdlib-jdk8')) {
+                          details.useTarget("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
+                      }
+                  }
+              }
+          }
+          EOF
+
+          # Also add gradle properties for clean AndroidX / R8 execution
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m" >> android/gradle.properties
+
       - name: Build Android Debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=512m" --no-daemon
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
