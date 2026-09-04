@@ -26,8 +26,14 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 9477386
+          packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
-      - name: Install Dependencies
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Node Dependencies
         run: |
           npm install
           npm install -D @capacitor/cli @capacitor/core @capacitor/android
@@ -36,20 +42,21 @@ jobs:
         run: |
           npm run build
 
-      - name: Recreate Android Project Cleanly
+      - name: Generate Fresh Android Project
         run: |
           rm -rf android
           npx cap add android
           npx cap sync android
 
-      - name: Build Android APK
+      - name: Build Android Debug APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=512m" --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: aegis-vpn-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
